@@ -1,2 +1,2 @@
-FROM gitlab/gitlab-ce:8.4.4-ce.0
+FROM gitlab/gitlab-ce:8.5.1-ce.0
 COPY root /
