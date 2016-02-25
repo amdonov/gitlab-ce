@@ -105,13 +105,13 @@ default['gitlab']['gitlab-rails']['lfs_storage_path'] = nil
 default['gitlab']['gitlab-rails']['elasticsearch_enabled'] = false
 default['gitlab']['gitlab-rails']['elasticsearch_host'] = nil
 default['gitlab']['gitlab-rails']['elasticsearch_port'] = nil
+default['gitlab']['gitlab-rails']['ldap_enabled'] = false
+default['gitlab']['gitlab-rails']['ldap_servers'] = []
 default['gitlab']['gitlab-rails']['pages_enabled'] = false
 default['gitlab']['gitlab-rails']['pages_host'] = nil
 default['gitlab']['gitlab-rails']['pages_port'] = nil
 default['gitlab']['gitlab-rails']['pages_https'] = false
 default['gitlab']['gitlab-rails']['pages_path'] = nil
-default['gitlab']['gitlab-rails']['ldap_enabled'] = false
-default['gitlab']['gitlab-rails']['ldap_servers'] = []
 
 ####
 # These LDAP settings are deprecated in favor of the new syntax. They are kept here for backwards compatibility.
@@ -142,10 +142,11 @@ default['gitlab']['gitlab-rails']['kerberos_port'] = nil
 default['gitlab']['gitlab-rails']['kerberos_https'] = nil
 
 default['gitlab']['gitlab-rails']['omniauth_enabled'] = false
-default['gitlab']['gitlab-rails']['omniauth_allow_single_sign_on'] = nil
+default['gitlab']['gitlab-rails']['omniauth_allow_single_sign_on'] = ['saml']
 default['gitlab']['gitlab-rails']['omniauth_auto_sign_in_with_provider'] = nil
 default['gitlab']['gitlab-rails']['omniauth_block_auto_created_users'] = nil
 default['gitlab']['gitlab-rails']['omniauth_auto_link_ldap_user'] = nil
+default['gitlab']['gitlab-rails']['omniauth_auto_link_saml_user'] = false
 default['gitlab']['gitlab-rails']['omniauth_providers'] = []
 default['gitlab']['gitlab-rails']['bitbucket'] = nil
 
@@ -249,7 +250,7 @@ default['gitlab']['unicorn']['worker_processes'] = [
 ].max # max because we need at least 2 workers
 default['gitlab']['unicorn']['listen'] = '127.0.0.1'
 default['gitlab']['unicorn']['port'] = 8080
-default['gitlab']['unicorn']['socket'] = '/var/opt/gitlab/gitlab-rails/sockets/gitlab.socket'
+default['gitlab']['unicorn']['socket'] = '/tmp/unicorn.socket'
 # Path to the unicorn server Process ID file
 # defaults to /opt/gitlab/var/unicorn/unicorn.pid. The install-dir path is set at build time
 default['gitlab']['unicorn']['pidfile'] = "#{node['package']['install-dir']}/var/unicorn/unicorn.pid"
@@ -296,8 +297,8 @@ default['gitlab']['postgresql']['gid'] = nil
 default['gitlab']['postgresql']['shell'] = "/bin/sh"
 default['gitlab']['postgresql']['home'] = "/var/opt/gitlab/postgresql"
 # Postgres User's Environment Path
-# defaults to /opt/gitlab/embedded/bin:/opt/gitlab/bin//usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/home/aaron.m.donovan/.local/bin:/home/aaron.m.donovan/bin. The install-dir path is set at build time
-default['gitlab']['postgresql']['user_path'] = "#{node['package']['install-dir']}/embedded/bin:#{node['package']['install-dir']}/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/home/aaron.m.donovan/.local/bin:/home/aaron.m.donovan/bin"
+# defaults to /opt/gitlab/embedded/bin:/opt/gitlab/bin/$PATH. The install-dir path is set at build time
+default['gitlab']['postgresql']['user_path'] = "#{node['package']['install-dir']}/embedded/bin:#{node['package']['install-dir']}/bin:$PATH"
 default['gitlab']['postgresql']['sql_user'] = "gitlab"
 default['gitlab']['postgresql']['sql_ci_user'] = "gitlab_ci"
 default['gitlab']['postgresql']['sql_mattermost_user'] = "gitlab_mattermost"
@@ -374,12 +375,12 @@ default['gitlab']['gitlab-workhorse']['enable'] = true
 default['gitlab']['gitlab-workhorse']['ha'] = false
 default['gitlab']['gitlab-workhorse']['listen_network'] = "unix"
 default['gitlab']['gitlab-workhorse']['listen_umask'] = 000
-default['gitlab']['gitlab-workhorse']['listen_addr'] = "/var/opt/gitlab/gitlab-workhorse/socket"
+default['gitlab']['gitlab-workhorse']['listen_addr'] = "/tmp/workhorse.socket"
 default['gitlab']['gitlab-workhorse']['auth_backend'] = "http://localhost:8080"
 default['gitlab']['gitlab-workhorse']['auth_socket'] = "''" # the empty string is the default in gitlab-workhorse option parser
 default['gitlab']['gitlab-workhorse']['pprof_listen_addr'] = "''" # put an empty string on the command line
 default['gitlab']['gitlab-workhorse']['dir'] = "/var/opt/gitlab/gitlab-workhorse"
-default['gitlab']['gitlab-workhorse']['log_dir'] = "/var/log/gitlab/gitlab-workhorse"
+default['gitlab']['gitlab-workhorse']['log_directory'] = "/var/log/gitlab/gitlab-workhorse"
 default['gitlab']['gitlab-workhorse']['proxy_headers_timeout'] = nil
 default['gitlab']['gitlab-workhorse']['env'] = {
   'PATH' => "#{node['package']['install-dir']}/bin:#{node['package']['install-dir']}/embedded/bin:/bin:/usr/bin"
@@ -391,7 +392,23 @@ default['gitlab']['gitlab-workhorse']['env'] = {
 
 default['gitlab']['mailroom']['enable'] = false
 default['gitlab']['mailroom']['ha'] = false
-default['gitlab']['mailroom']['log_dir'] = "/var/log/gitlab/mailroom"
+default['gitlab']['mailroom']['log_directory'] = "/var/log/gitlab/mailroom"
+
+####
+# GitLab Pages Daemon
+####
+default['gitlab']['gitlab-pages']['enable'] = false
+default['gitlab']['gitlab-pages']['external_http'] = nil
+default['gitlab']['gitlab-pages']['external_https'] = nil
+default['gitlab']['gitlab-pages']['listen_proxy'] = "localhost:8090"
+default['gitlab']['gitlab-pages']['pages_path'] = nil
+default['gitlab']['gitlab-pages']['domain'] = nil
+default['gitlab']['gitlab-pages']['cert'] = nil
+default['gitlab']['gitlab-pages']['cert_key'] = nil
+default['gitlab']['gitlab-pages']['redirect_http'] = true
+default['gitlab']['gitlab-pages']['use_http2'] = true
+default['gitlab']['gitlab-pages']['dir'] = "/var/opt/gitlab/gitlab-pages"
+default['gitlab']['gitlab-pages']['log_directory'] = "/var/log/gitlab/gitlab-pages"
 
 ####
 # Nginx
@@ -402,7 +419,7 @@ default['gitlab']['nginx']['dir'] = "/var/opt/gitlab/nginx"
 default['gitlab']['nginx']['log_directory'] = "/var/log/gitlab/nginx"
 default['gitlab']['nginx']['worker_processes'] = node['cpu']['total'].to_i
 default['gitlab']['nginx']['worker_connections'] = 10240
-default['gitlab']['nginx']['log_format'] = ' -  [] ""   "" ""' #  NGINX 'combined' format
+default['gitlab']['nginx']['log_format'] = '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"' #  NGINX 'combined' format
 default['gitlab']['nginx']['sendfile'] = 'on'
 default['gitlab']['nginx']['tcp_nopush'] = 'on'
 default['gitlab']['nginx']['tcp_nodelay'] = 'on'
@@ -432,6 +449,12 @@ default['gitlab']['nginx']['custom_gitlab_server_config'] = nil
 default['gitlab']['nginx']['custom_nginx_config'] = nil
 default['gitlab']['nginx']['proxy_read_timeout'] = 300
 default['gitlab']['nginx']['proxy_connect_timeout'] = 300
+default['gitlab']['nginx']['proxy_set_headers'] = {
+  "Host" => "$http_host",
+  "X-Real-IP" => "$remote_addr",
+  "X-Forwarded-For" => "$proxy_add_x_forwarded_for"
+}
+
 
 ###
 # Logging
@@ -460,7 +483,7 @@ default['gitlab']['remote-syslog']['dir'] = "/var/opt/gitlab/remote-syslog"
 default['gitlab']['remote-syslog']['log_directory'] = "/var/log/gitlab/remote-syslog"
 default['gitlab']['remote-syslog']['destination_host'] = "localhost"
 default['gitlab']['remote-syslog']['destination_port'] = 514
-default['gitlab']['remote-syslog']['services'] = %w{redis nginx unicorn gitlab-rails gitlab-shell postgresql sidekiq ci-redis ci-unicorn ci-sidekiq}
+default['gitlab']['remote-syslog']['services'] = %w{redis nginx unicorn gitlab-rails gitlab-shell postgresql sidekiq gitlab-workhorse gitlab-pages}
 
 ###
 # Logrotate
@@ -469,7 +492,7 @@ default['gitlab']['logrotate']['enable'] = true
 default['gitlab']['logrotate']['ha'] = false
 default['gitlab']['logrotate']['dir'] = "/var/opt/gitlab/logrotate"
 default['gitlab']['logrotate']['log_directory'] = "/var/log/gitlab/logrotate"
-default['gitlab']['logrotate']['services'] = %w{nginx unicorn gitlab-rails gitlab-shell gitlab-ci}
+default['gitlab']['logrotate']['services'] = %w{nginx unicorn gitlab-rails gitlab-shell gitlab-workhorse gitlab-pages}
 default['gitlab']['logrotate']['pre_sleep'] = 600 # sleep 10 minutes before rotating after start-up
 default['gitlab']['logrotate']['post_sleep'] = 3000 # wait 50 minutes after rotating
 
@@ -535,14 +558,14 @@ default['gitlab']['gitlab-ci']['db_pool'] = 10
 default['gitlab']['gitlab-ci']['db_username'] = "gitlab_ci"
 default['gitlab']['gitlab-ci']['db_password'] = nil
 # Path to postgresql socket directory
-default['gitlab']['gitlab-ci']['db_host'] = "/var/opt/gitlab/postgresql"
+default['gitlab']['gitlab-ci']['db_host'] = "/tmp"
 default['gitlab']['gitlab-ci']['db_port'] = 5432
 default['gitlab']['gitlab-ci']['db_socket'] = nil
 
 # resque.yml settings
 default['gitlab']['gitlab-ci']['redis_host'] = "127.0.0.1"
 default['gitlab']['gitlab-ci']['redis_port'] = nil
-default['gitlab']['gitlab-ci']['redis_socket'] = "/tmp/ci-redis.socket"
+default['gitlab']['gitlab-ci']['redis_socket'] = "/tmp/ciredis.socket"
 
 # config/initializers/smtp_settings.rb settings
 default['gitlab']['gitlab-ci']['smtp_enable'] = false
@@ -563,7 +586,7 @@ default['gitlab']['ci-unicorn'] = default['gitlab']['unicorn'].dup
 default['gitlab']['ci-unicorn']['enable'] = false
 default['gitlab']['ci-unicorn']['log_directory'] = "/var/log/gitlab/ci-unicorn"
 default['gitlab']['ci-unicorn']['port'] = 8181
-default['gitlab']['ci-unicorn']['socket'] = '/var/opt/gitlab/gitlab-ci/sockets/gitlab.socket'
+default['gitlab']['ci-unicorn']['socket'] = '/tmp/ciunicorn.socket'
 # Path to the GitLab CI's Unicorn Process ID file
 # defaults to /opt/gitlab/var/ci-unicorn/unicorn.pid. The install-dir path is set at build time
 default['gitlab']['ci-unicorn']['pidfile'] = "#{node['package']['install-dir']}/var/ci-unicorn/unicorn.pid"
@@ -582,7 +605,7 @@ default['gitlab']['ci-redis'] = default['gitlab']['redis'].dup
 default['gitlab']['ci-redis']['enable'] = false
 default['gitlab']['ci-redis']['dir'] = "/var/opt/gitlab/ci-redis"
 default['gitlab']['ci-redis']['log_directory'] = "/var/log/gitlab/ci-redis"
-default['gitlab']['ci-redis']['unixsocket'] = "/tmp/ci-redis.socket"
+default['gitlab']['ci-redis']['unixsocket'] = "/tmp/ciredis.socket"
 
 ####
 # CI NGINX
@@ -620,7 +643,10 @@ default['gitlab']['mattermost']['service_enable_post_username_override'] = false
 default['gitlab']['mattermost']['service_enable_post_icon_override'] = false
 default['gitlab']['mattermost']['service_enable_testing'] = false
 default['gitlab']['mattermost']['service_enable_security_fix_alert'] = true
+default['gitlab']['mattermost']['service_enable_insecure_outgoing_connections'] = false
 default['gitlab']['mattermost']['service_enable_outgoing_webhooks'] = false
+default['gitlab']['mattermost']['service_enable_commands'] = false
+default['gitlab']['mattermost']['service_enable_only_admin_integrations'] = true
 default['gitlab']['mattermost']['service_enable_oauth_service_provider'] = false
 default['gitlab']['mattermost']['service_enable_developer'] = false
 default['gitlab']['mattermost']['service_session_length_web_in_days'] = 30
@@ -659,6 +685,8 @@ default['gitlab']['mattermost']["file_amazon_s3_location_constraint"] = false
 default['gitlab']['mattermost']["file_amazon_s3_lowercase_bucket"] = false
 
 default['gitlab']['mattermost']['email_enable_sign_up_with_email'] = false
+default['gitlab']['mattermost']['email_enable_sign_in_with_email'] = true
+default['gitlab']['mattermost']['email_enable_sign_in_with_username'] = false
 default['gitlab']['mattermost']['email_send_email_notifications'] = false
 default['gitlab']['mattermost']['email_require_email_verification'] = false
 default['gitlab']['mattermost']['email_smtp_username'] = nil
@@ -714,4 +742,3 @@ default['gitlab']['mattermost-nginx']['enable'] = false
 ####
 default['gitlab']['pages-nginx'] = default['gitlab']['nginx'].dup
 default['gitlab']['pages-nginx']['enable'] = true
-
